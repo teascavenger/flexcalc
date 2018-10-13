@@ -7,14 +7,11 @@ setup(
 
     install_requires=[
     "numpy",
-    "astra-toolbox",
     "tqdm",
-    "imageio",
-    "tifffile",
-    "psutil",
-    "toml",
+    "scipy",
     "transforms3d",
-    "paramiko"],
+    "flexdata",
+    "flextomo"],
 
     version='0.0.1',
 )

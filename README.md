@@ -1,4 +1,4 @@
-# flexXXX
+# flexcalc
 
 To install using setuptools (setup.py):
 
