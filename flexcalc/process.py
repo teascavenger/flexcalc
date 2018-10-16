@@ -1124,7 +1124,7 @@ def optimize_rotation_center(projections, geometry, guess = None, subscale = 1, 
     
     return guess
 
-def process_flex(path, sample = 1, skip = 1, memmap = None):
+def process_flex(path, sample = 1, skip = 1, memmap = None, index = None):
     '''
     Read and process the data.
     
@@ -1140,8 +1140,8 @@ def process_flex(path, sample = 1, skip = 1, memmap = None):
     # Read:    
     print('Reading...')
     
-    index = []
-    proj, flat, dark, meta = io.read_flexray(path, sample = sample, skip = skip, memmap = memmap, index = index)
+    #index = []
+    proj, flat, dark, meta = io.read_flexray(path, sample = sample, skip = skip, memmap = memmap)
                 
     # Show fow much memory we have:
     #flexUtil.print_memory()     
@@ -1160,9 +1160,10 @@ def process_flex(path, sample = 1, skip = 1, memmap = None):
     # Fix nans and infs after log:
     proj[~numpy.isfinite(proj)] = 10
     
-    proj = io.raw2astra(proj)    
+    proj = array.raw2astra(proj)    
     
     # Here we will also check whether all files were read and if not - modify thetas accordingly:
+    '''
     index = numpy.array(index)
     index //= skip
     
@@ -1179,7 +1180,7 @@ def process_flex(path, sample = 1, skip = 1, memmap = None):
         import pylab
         pylab.plot(thetas, thetas ,'*')
         pylab.title('Thetas')
-        
+    '''    
     # Show fow much memory we have:
     # flexUtil.print_memory()             
     

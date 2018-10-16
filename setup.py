@@ -1,8 +1,8 @@
 from setuptools import setup, find_packages
 
 setup(
-    name="flexdata",
-    package_dir={'flexdata': 'flexdata'},
+    name="flexcalc",
+    package_dir={'flexcalc': 'flexcalc'},
     packages=find_packages(),
 
     install_requires=[
