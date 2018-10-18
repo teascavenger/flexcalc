@@ -66,7 +66,7 @@ class Block:
         if self.meta:
             return self.meta.get('geometry')
         else:
-            return None
+            raise Exception('Meta data is not initialized!')
         
     def copy(self):
         
@@ -314,6 +314,8 @@ class Pipe:
         
         print('Adding: ', local_path)
         
+        time.sleep(0.1) # This is needed to let print message be printed before the porogress bar
+        
         if not '*' in local_path:
 
             # Add a block with the given path                        
@@ -392,9 +394,6 @@ class Pipe:
                 # Push the bastard down the pipe!
                 for action in self._action_que_:
                     
-                    print('Data type:')
-                    print(type(self._block_.data))
-                    
                     # If this block was put on standby - stop and go to the next one.
                     if (self._block_.status == _ACTION_STANDBY_): 
                         break
@@ -465,16 +464,15 @@ class Pipe:
                 if self._block_.status == _STATUS_PENDING_:
                     self._block_.status = _STATUS_READY_
         
-        except Exception as eerrrr: 
-                        
-            print("")
-            print("    (×_×)     Pipe error      (×_×) ")
-            print("")
-            print('ERROR:', eerrrr)
+        except:
             
             info = sys.exc_info()
             traceback.print_exception(*info)
             
+            print("")
+            print("    (×_×)     Pipe error      (×_×) ")
+            print("")
+                        
             print('Will try to continue....')
        
             
@@ -663,7 +661,7 @@ class Pipe:
         if not samp: samp = 1
         
         # Read volume:
-        data.data = io.read_tiffs(path, 'vol', skip = samp, sample = [samp, samp], memmap = memmap_file)  
+        data.data = io.read_tiffs(path, 'vol', skip = samp, sample = samp, memmap = memmap_file)  
         
         data.meta = io.read_toml(os.path.join(path, 'meta.toml')) 
         
@@ -676,6 +674,44 @@ class Pipe:
         Load the volume stack.
         """
         self._add_action_('read_volume', self._read_volume_, _ACTION_BATCH_, sampling, memmap)
+                
+    def _read_projections_(self, data, count, argument):
+        """
+        Load the projection stack
+        """
+        path = data.path
+        
+        samp = self._arg_(argument, 0)
+        memmap = self._arg_(argument, 1)
+        
+        if memmap:
+            if not self._memmap_path_:
+                raise Exception('memmap_path is not initialized in pipe!')
+            
+            if not os.path.exists(self._memmap_path_):
+                        os.mkdir(self._memmap_path_)  
+            
+            memmap_file = os.path.join(self._memmap_path_, 'projections')
+            self._memmaps_.append(memmap_file)
+            
+        else:
+            memmap_file = None
+        
+        if not samp: samp = 1
+        
+        # Read volume:
+        data.data = io.read_tiffs(path, 'scan', skip = samp, sample = samp, memmap = memmap_file)  
+        data.data = array.raw2astra(data.data)
+        
+        data.type = 'projections'
+        
+        self._record_history_('Projections loaded.', [])
+        
+    def read_projections(self, sampling = 1, memmap = False):
+        """
+        Load the volume stack.
+        """
+        self._add_action_('read_projections', self._read_projections_, _ACTION_BATCH_, sampling, memmap)
                     
     def _process_flex_(self, data, count, argument):
         """
@@ -824,7 +860,7 @@ class Pipe:
             
             # Compute total geometries for each of the groups:                                
             for ii, geoms in enumerate(geoms_list):
-                tot_shape, tot_geom = io.tiles_shape(data.data.shape, geoms)  
+                tot_shape, tot_geom = array.tiles_shape(data.data.shape, geoms)  
                     
                 # Create memmaps:
                 if memmap: 
