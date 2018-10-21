@@ -12,7 +12,7 @@ This module uses NIST data (embedded in xraylib module) to simulate x-ray spectr
 import numpy
 import xraylib
 from . import resolution
-from . import project
+from flextomo import project
 from flexdata import display
 
 # Some useful physical constants:

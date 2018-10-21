@@ -19,9 +19,11 @@ from tqdm import tqdm
 from flexdata import io
 from flexdata import display
 from flexdata import array
+
 from flextomo import phantom
 from flextomo import project
 
+from . import spectrum
 # >>>>>>>>>>>>>>>>>>>>>>>>>>>> Methods >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
 def generate_stl(data, geometry):
@@ -1031,11 +1033,14 @@ def _sample_FDK_(projections, geometry, sample):
     
     volume = project.init_volume(projections, geometry_)
     
+    # Do FDK without progress_bar:
+    project.settings['progress_bar'] = False
     project.FDK(projections, volume, geometry_)
+    project.settings['progress_bar'] = True
     
     return volume
     
-def _modifier_l2cost_(projections, geometry, subsample, value, key = 'axs_hrz', display = False):
+def _modifier_l2cost_(projections, geometry, subsample, value, key = 'axs_hrz', preview = False):
     '''
     Cost function based on L2 norm of the first derivative of the volume. Computation of the first derivative is done by FDK with pre-initialized reconstruction filter.
     '''
@@ -1044,6 +1049,8 @@ def _modifier_l2cost_(projections, geometry, subsample, value, key = 'axs_hrz', 
     geometry_[key] = value
 
     vol = _sample_FDK_(projections, geometry_, subsample)
+    
+    vol[vol < 0] = 0
 
     l2 = 0
     
@@ -1054,12 +1061,12 @@ def _modifier_l2cost_(projections, geometry, subsample, value, key = 'axs_hrz', 
         
         l2 += numpy.sum(grad)
         
-    if display:
+    if preview:
         display.display_slice(vol, title = 'Guess = %0.2e, L2 = %0.2e'% (value, l2))    
             
     return -l2    
     
-def _optimize_modifier_subsample_(values, projections, geometry, samp = [1, 1, 1], key = 'axs_hrz', display = True):  
+def optimize_modifier_subsample(values, projections, geometry, samp = [1, 1, 1], key = 'axs_hrz', preview = False):  
     '''
     Optimize a modifier using a particular sampling of the projection data.
     '''  
@@ -1073,15 +1080,17 @@ def _optimize_modifier_subsample_(values, projections, geometry, samp = [1, 1, 1
     ii = 0
     for val in tqdm(values, unit = 'points'):
         
-        func_values[ii] = _modifier_l2cost_(projections, geometry, samp, val, 'axs_hrz', display)
+        func_values[ii] = _modifier_l2cost_(projections, geometry, samp, val, 'axs_hrz', preview)
         
         ii += 1          
         
     min_index = func_values.argmin()    
     
+    display.plot(values, func_values, title = 'Objective')
+    
     return _parabolic_min_(func_values, min_index, values)  
         
-def optimize_rotation_center(projections, geometry, guess = None, subscale = 1, centre_of_mass = True):
+def optimize_rotation_center(projections, geometry, guess = None, subscale = 1, centre_of_mass = False):
     '''
     Find a center of rotation. If you can, use the center_of_mass option to get the initial guess.
     If that fails - use a subscale larger than the potential deviation from the center. Usually, 8 or 16 works fine!
@@ -1098,7 +1107,7 @@ def optimize_rotation_center(projections, geometry, guess = None, subscale = 1, 
         
             guess = geometry['axs_hrz']
         
-    img_pix = geometry['det_pixel'] / ((geometry['src2obj'] + geometry['det2obj']) / geometry['src2obj'])
+    img_pix = geometry['img_pixel']
     
     print('The initial guess for the rotation axis shift is %0.3f mm' % guess)
     
@@ -1116,7 +1125,7 @@ def optimize_rotation_center(projections, geometry, guess = None, subscale = 1, 
         # Create a search space of 5 values around the initial guess:
         trial_values = numpy.linspace(guess - img_pix * subscale, guess + img_pix * subscale, 5)
         
-        guess = _optimize_modifier_subsample_(trial_values, projections, geometry, samp, key = 'axs_hrz', display = False)
+        guess = optimize_modifier_subsample(trial_values, projections, geometry, samp, key = 'axs_hrz', preview = False)
                 
         print('Current guess is %0.3f mm' % guess)
         
@@ -1183,6 +1192,7 @@ def process_flex(path, sample = 1, skip = 1, memmap = None, index = None):
     '''    
     # Show fow much memory we have:
     # flexUtil.print_memory()             
+    print('Done!')
     
     return proj, meta
 
@@ -1413,26 +1423,32 @@ def append_tile(data, geom, tot_data, tot_geom):
         # Create distances to edge:
         tot_data[:, ii, :] = ((base_dist * base) + (new_dist * new)) / norm
         
-def data_to_spectrum(path):
+def data_to_spectrum(path, compound = 'Al', density = 2.7):
     """
     Convert data with Al calibration object at path to a spectrum.txt.
     """
     import os
 
-    proj, meta = process_flex(path)
+    proj, meta = process_flex(path, skip = 2, sample = 2)
     
     display.display_slice(proj, dim=0,title = 'PROJECTIONS')
 
     vol = project.init_volume(proj, meta['geometry'])
     
+    print('FDK reconstruction...')
+    
     project.FDK(proj, vol, meta['geometry'])
     display.display_slice(vol, title = 'Uncorrected FDK')
 
+    print('Callibrating spectrum...')    
     e, s = calibrate_spectrum(proj, vol, meta, compound = 'Al', density = 2.7, iterations = 1000, n_bin = 20)   
 
     file = os.path.join(path, 'spectrum.txt')
     numpy.savetxt(file, [e, s])
+    
+    print('Spectrum computed.')
         
+    return e, s
     
 def calibrate_spectrum(projections, volume, meta, compound = 'Al', density = 2.7, threshold = None, iterations = 1000, n_bin = 10):
     '''
@@ -1443,7 +1459,6 @@ def calibrate_spectrum(projections, volume, meta, compound = 'Al', density = 2.7
     Please, use conventional geometry. 
     ''' 
     
-    from . import flexSpectrum
     #import random
     
     geometry = meta['geometry']
@@ -1548,13 +1563,13 @@ def calibrate_spectrum(projections, volume, meta, compound = 'Al', density = 2.7
     
     energy = numpy.linspace(5, 100, n_bin)
     
-    mu = flexSpectrum.linear_attenuation(energy, compound, density)
+    mu = spectrum.linear_attenuation(energy, compound, density)
     exp_matrix = numpy.exp(-numpy.outer(length_0, mu))
     
     # Initial guess of the spectrum:
-    spec = flexSpectrum.bremsstrahlung(energy, meta['settings']['voltage']) 
-    spec *= flexSpectrum.scintillator_efficiency(energy, 'Si', rho = 5, thickness = 0.5)
-    spec *= flexSpectrum.total_transmission(energy, 'H2O', 1, 1)
+    spec = spectrum.bremsstrahlung(energy, meta['settings']['voltage']) 
+    spec *= spectrum.scintillator_efficiency(energy, 'Si', rho = 5, thickness = 0.5)
+    spec *= spectrum.total_transmission(energy, 'H2O', 1, 1)
     spec *= energy
     spec /= spec.sum()
     
@@ -1605,7 +1620,7 @@ def calibrate_spectrum(projections, volume, meta, compound = 'Al', density = 2.7
     # synthetic intensity for a check:
     _intensity = exp_matrix.dot(spec)
     
-    # Display:       
+    # Display:   
     plt.figure()
     plt.semilogy(length[::200], intensity[::200], 'b.', lw=4, alpha=.8)
     plt.semilogy(length_0, intensity_0, 'g--')
@@ -1629,12 +1644,11 @@ def calibrate_spectrum(projections, volume, meta, compound = 'Al', density = 2.7
     
     return energy, spec
     
-def equivalent_density(projections, meta, energy, spectrum, compound, density = 2, preview = False):
+def equivalent_density(projections, meta, energy, spectr, compound, density = 2, preview = False):
     '''
     Transfrom intensity values to projected density for a single material data
     '''
     # Assuming that we have log data!
-    from . import flexSpectrum    
 
     print('Generating the transfer function.')
     
@@ -1642,7 +1656,7 @@ def equivalent_density(projections, meta, energy, spectrum, compound, density = 
         display.plot(energy, spectrum, semilogy=False, title = 'Spectrum')
     
     # Attenuation of 1 mm:
-    mu = flexSpectrum.linear_attenuation(energy, compound, density)
+    mu = spectrum.linear_attenuation(energy, compound, density)
     
     # Make thickness range that is sufficient for interpolation:
     #m = (geometry['src2obj'] + geometry['det2obj']) / geometry['src2obj']
@@ -1658,7 +1672,7 @@ def equivalent_density(projections, meta, energy, spectrum, compound, density = 
     
     exp_matrix = numpy.exp(-numpy.outer(thickness, mu))
         
-    synth_counts = exp_matrix.dot(spectrum)
+    synth_counts = exp_matrix.dot(spectr)
     
     #flexUtil.plot(thickness, title = 'thickness')
     #flexUtil.plot(mu, title = 'mu')

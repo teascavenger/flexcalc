@@ -11,16 +11,18 @@ from flexdata import display
 
 from flextomo import project
 from flextomo import phantom
-from flextomo import spectrum
-from flextomo import resolution
+
+from flexcalc import spectrum
+from flexcalc import resolution
 
 import numpy
 
 #%% Create volume and forward project:
     
 # Initialize images:    
-x = 5
-h = 512 * x
+x = 1                 #  resolution multiplier
+h = 512 * x           # volume size
+
 vol = numpy.zeros([1, h, h], dtype = 'float32')
 proj = numpy.zeros([1, 361, h], dtype = 'float32')
 
@@ -32,8 +34,13 @@ det_pixel = 0.001 / x # mm (1 micron)
 geometry = io.init_geometry(src2obj, det2obj, det_pixel, [0, 360])
 
 # Create phantom (150 micron wide, 15 micron wall thickness):
-vol = phantom(vol.shape, 'bubble', [150*x, 30*x,1])     
-vol += phantom(vol.shape, 'bubble', [10*x, 3*x,1])     
+vol = phantom.sphere(vol.shape, geometry, 0.08)     
+vol -= phantom.sphere(vol.shape, geometry, 0.07)     
+
+# Show:
+display.display_slice(vol, title = 'Phantom')
+
+# Project:
 project.forwardproject(proj, vol, geometry)
 
 #%%
@@ -58,8 +65,6 @@ proj_i = numpy.exp(-proj * n )
 
 # Field intensity:
 proj_i = resolution.apply_ctf(proj_i, phase_ctf) ** 2
-
-#proj_i = numpy.abs(numpy.exp(-proj * n ))**2
 
 display.display_slice(proj_i, title = 'Projections (phase contrast)')
 
@@ -89,11 +94,3 @@ display.display_slice(proj_inv, title = 'Inverted phase contrast')
 vol_rec = numpy.zeros_like(vol)
 project.FDK(-numpy.log(proj_inv), vol_rec, geometry)
 display.display_slice(vol_rec, title = 'FDK')   
-
-#%% SIRT algebraic deconvolution:
- 
-vol_rec = numpy.zeros_like(vol)    
-options = {'bounds':[0, 10], 'l2_update':True, 'block_number':2, 'index':'sequential', 'ctf':dual_ctf}
-project.SIRT(-numpy.log(proj_i), vol_rec, geometry, iterations = 10, options = options)
-
-display.display_slice(vol_rec, title = 'SIRT')
