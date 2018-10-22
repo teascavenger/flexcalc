@@ -21,3 +21,7 @@ $RECYCLE.BIN/
 # =========================
 # Operating System Files
 # =========================
+flexcalc.egg-info/dependency_links.txt
+flexcalc.egg-info/PKG-INFO
+flexcalc.egg-info/SOURCES.txt
+flexcalc/__pycache__/process.cpython-37.pyc

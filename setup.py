@@ -8,7 +8,10 @@ setup(
     install_requires=[
     "numpy",
     "tqdm",
+    "simpleitk",
     "scipy",
+    "numpy-stl",
+    "scikit-image",
     "transforms3d",
     "flexdata",
     "flextomo"],

@@ -17,19 +17,19 @@ from flexcalc import process
 
 path = '/ufs/ciacc/flexbox/al_test/90KV_no_filt/'
 
-proj, meta = process.process_flex(path, sample = 2, skip = 2)
+proj, meta = process.process_flex(path, sample = 1, skip = 1)
 
 #%% Use optimize_rotation_center:
 
 # Name and range of the parameter to optimize:
 key = 'det_rot'
-trial_values = numpy.linspace(-1, 1, 20)
+trial_values = numpy.linspace(-0.01, 0.01, 11)
 
 # Subsampling of data (vertical x 10)
-samp = [10, 1, 1]
+samp = [5, 1, 1]
 
 # Optimization:
-guess = process.optimize_modifier_subsample(trial_values, proj, meta['geometry'], samp = samp, key = key, preview = True)
+guess = process.optimize_modifier(trial_values, proj, meta['geometry'], samp = samp, key = key, preview = True)
 
 #%% Reconstruct uncorrected:
 

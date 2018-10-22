@@ -8,13 +8,24 @@ This module contains calculation routines for pre/post processing.
 """
 
 # >>>>>>>>>>>>>>>>>>>>>>>>>>>> Imports >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-
+import os
 import numpy
+
 from scipy import ndimage
 from scipy import signal
+
 import transforms3d
 import scipy.ndimage.interpolation as interp
+
 from tqdm import tqdm
+
+from skimage import measure
+from skimage.filters import threshold_otsu
+from skimage import feature
+    
+from stl import mesh
+
+import SimpleITK as sitk
 
 from flexdata import io
 from flexdata import display
@@ -24,16 +35,13 @@ from flextomo import phantom
 from flextomo import project
 
 from . import spectrum
+
 # >>>>>>>>>>>>>>>>>>>>>>>>>>>> Methods >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
 def generate_stl(data, geometry):
     """
     Make a mesh from a volume.
     """
-    
-    from skimage import measure
-    from stl import mesh
-
     # Segment the volume:
     threshold = data > binary_threshold(data, mode = 'otsu')
     
@@ -133,12 +141,11 @@ def binary_threshold(data, mode = 'histogram', threshold = 0):
     '''
     
     import matplotlib.pyplot as plt
-    import skimage.filters
     
     print('Applying binary threshold...')
     
     if mode == 'otsu':
-        threshold = skimage.filters.threshold_otsu(data[::2,::2,::2])    
+        threshold = threshold_otsu(data[::2,::2,::2])    
         
     elif mode == 'histogram':
         x, y = histogram(data[::2,::2,::2], log = True, plot = False)
@@ -393,9 +400,7 @@ def _itk2mat_(transform, shape):
 def _mat2itk_(R, T, shape):
     """
     Initialize ITK transform from a rotation matrix and a translation vector
-    """   
-    import SimpleITK as sitk
-    
+    """       
     centre = numpy.array(shape, dtype = float) // 2
     euler = transforms3d.euler.mat2euler(R, axes = 'szyx')    
 
@@ -456,8 +461,6 @@ def _itk_registration_(fixed, moving, R_init = None, T_init = None, shrink = [4,
         R: rotation matrix
         
     """
-    import SimpleITK as sitk
-        
     #  Progress bar    
     pbar = tqdm(unit = 'Operations', total=1) 
     
@@ -562,9 +565,7 @@ def register_volumes(fixed, moving, subsamp = 2, use_moments = True, use_CG = Tr
         
     Returns:
         
-    '''    
-    import skimage.filters
-    
+    '''        
     if fixed.shape != moving.shape: raise IndexError('Fixed and moving volumes have different dimensions:', fixed.shape, moving.shape)
     
     print('Using image moments to register volumes.')
@@ -577,7 +578,7 @@ def register_volumes(fixed, moving, subsamp = 2, use_moments = True, use_CG = Tr
         # We use Otsu here instead of binary_threshold to make sure that the same 
         # threshold is applied to both images:
         
-        threshold = skimage.filters.threshold_otsu(numpy.append(fixed_0[::2, ::2, ::2], moving_0[::2, ::2, ::2]))
+        threshold = threshold_otsu(numpy.append(fixed_0[::2, ::2, ::2], moving_0[::2, ::2, ::2]))
         fixed_0[fixed_0 < threshold] = 0
         moving_0[moving_0 < threshold] = 0
         
@@ -1040,7 +1041,7 @@ def _sample_FDK_(projections, geometry, sample):
     
     return volume
     
-def _modifier_l2cost_(projections, geometry, subsample, value, key = 'axs_hrz', preview = False):
+def _modifier_l2cost_(projections, geometry, subsample, value, key, preview):
     '''
     Cost function based on L2 norm of the first derivative of the volume. Computation of the first derivative is done by FDK with pre-initialized reconstruction filter.
     '''
@@ -1066,21 +1067,21 @@ def _modifier_l2cost_(projections, geometry, subsample, value, key = 'axs_hrz', 
             
     return -l2    
     
-def optimize_modifier_subsample(values, projections, geometry, samp = [1, 1, 1], key = 'axs_hrz', preview = False):  
+def optimize_modifier(values, projections, geometry, samp = [1, 1, 1], key = 'axs_hrz', preview = False):  
     '''
-    Optimize a modifier using a particular sampling of the projection data.
+    Optimize a geometry modifier using a particular sampling of the projection data.
     '''  
     maxiter = values.size
     
     # Valuse of the objective function:
     func_values = numpy.zeros(maxiter)    
     
-    print('Starting a full search from: %0.3f mm' % values.min(), 'to %0.3f mm'% values.max())
+    print('Starting a full search from: %0.3f' % values.min(), 'to %0.3f'% values.max())
     
     ii = 0
-    for val in tqdm(values, unit = 'points'):
+    for val in tqdm(values, unit = 'point'):
         
-        func_values[ii] = _modifier_l2cost_(projections, geometry, samp, val, 'axs_hrz', preview)
+        func_values[ii] = _modifier_l2cost_(projections, geometry, samp, val, key, preview)
         
         ii += 1          
         
@@ -1125,7 +1126,7 @@ def optimize_rotation_center(projections, geometry, guess = None, subscale = 1, 
         # Create a search space of 5 values around the initial guess:
         trial_values = numpy.linspace(guess - img_pix * subscale, guess + img_pix * subscale, 5)
         
-        guess = optimize_modifier_subsample(trial_values, projections, geometry, samp, key = 'axs_hrz', preview = False)
+        guess = optimize_modifier(trial_values, projections, geometry, samp, key = 'axs_hrz', preview = False)
                 
         print('Current guess is %0.3f mm' % guess)
         
@@ -1236,10 +1237,7 @@ def medipix_quadrant_shift(data):
 def _find_shift_(data_ref, data_slave, offset, dim = 1):    
     """
     Find a small 2D shift between two 3d images.
-    """
-    from skimage import feature
-    import scipy.ndimage
-     
+    """ 
     shifts = []
     
     # Look at a few slices along the dimension dim:
@@ -1269,8 +1267,8 @@ def _find_shift_(data_ref, data_slave, offset, dim = 1):
             #flexUtil.display_slice(im_ref - im_slv, title = 'im_ref')
                                   
             # Laplace is way better for clipped objects than comparing intensities!
-            im_ref = scipy.ndimage.laplace(im_ref)
-            im_slv = scipy.ndimage.laplace(im_slv)
+            im_ref = ndimage.laplace(im_ref)
+            im_slv = ndimage.laplace(im_slv)
         
             # Shift registration with subpixel accuracy (skimage):
             shift, error, diffphase = feature.register_translation(im_ref, im_slv, 10)
@@ -1427,8 +1425,6 @@ def data_to_spectrum(path, compound = 'Al', density = 2.7):
     """
     Convert data with Al calibration object at path to a spectrum.txt.
     """
-    import os
-
     proj, meta = process_flex(path, skip = 2, sample = 2)
     
     display.display_slice(proj, dim=0,title = 'PROJECTIONS')
