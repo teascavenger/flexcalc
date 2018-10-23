@@ -10,6 +10,7 @@ This module contains calculation routines for pre/post processing.
 # >>>>>>>>>>>>>>>>>>>>>>>>>>>> Imports >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 import os
 import numpy
+import time
 
 from scipy import ndimage
 from scipy import signal
@@ -156,8 +157,7 @@ def binary_threshold(data, mode = 'histogram', threshold = 0):
         
         plt.figure()
         plt.plot(x, y)
-        plt.show()
-    
+            
         # Find air maximum:
         air_index = numpy.argmax(y)
         
@@ -1057,10 +1057,9 @@ def _modifier_l2cost_(projections, geometry, subsample, value, key, preview):
     
     for ii in range(vol.shape[0]):
         grad = numpy.gradient(numpy.squeeze(vol[ii, :, :]))
-        
         grad = (grad[0] ** 2 + grad[1] ** 2)         
         
-        l2 += numpy.sum(grad)
+        l2 += numpy.mean(grad[grad > 0])
         
     if preview:
         display.display_slice(vol, title = 'Guess = %0.2e, L2 = %0.2e'% (value, l2))    
@@ -1077,6 +1076,8 @@ def optimize_modifier(values, projections, geometry, samp = [1, 1, 1], key = 'ax
     func_values = numpy.zeros(maxiter)    
     
     print('Starting a full search from: %0.3f' % values.min(), 'to %0.3f'% values.max())
+    
+    time.sleep(0.1) # To print TQDM properly
     
     ii = 0
     for val in tqdm(values, unit = 'point'):
@@ -1577,36 +1578,18 @@ def calibrate_spectrum(projections, volume, meta, compound = 'Al', density = 2.7
     spec0 = spec.copy()
     #spec *= 0
     
-    # SIRT type:
-    import matplotlib.pyplot as plt
-    '''
-    w = exp_matrix.T.dot(exp_matrix.dot(spec + 1))
-    w[w < 0.01] = numpy.inf
-    
-    print(w)
-    
-    for ii in range(iterations): 
-        frw = exp_matrix.dot(spec)
-        
-        grad = exp_matrix.T.dot(intensity_0 - frw)
-        spec = spec + grad / w
-        spec[spec < 0] = 0
-        
-    '''    
-    # EM type:
-    
+    # EM type:   
     for ii in range(iterations): 
         frw = exp_matrix.dot(spec)
 
         epsilon = frw.max() / 100
         frw[frw < epsilon] = epsilon
-
+        
         spec = spec * exp_matrix.T.dot(intensity_0 / frw) / norm_sum
 
         # Make sure that the total count of spec is 1
         #spec = spec / spec.sum()
-    
-    
+        
     print('Spectrum computed.')
         
     #flexUtil.plot(length_0, title = 'thickness')
@@ -1615,6 +1598,8 @@ def calibrate_spectrum(projections, volume, meta, compound = 'Al', density = 2.7
     
     # synthetic intensity for a check:
     _intensity = exp_matrix.dot(spec)
+    
+    import matplotlib.pyplot as plt
     
     # Display:   
     plt.figure()
@@ -1676,13 +1661,15 @@ def equivalent_density(projections, meta, energy, spectr, compound, density = 2,
     
     if preview:
         display.plot(thickness,synth_counts, semilogy=True, title = 'Attenuation v.s. thickness [mm].')
-    
+        
     synth_counts = -numpy.log(synth_counts)
     
     print('Callibration attenuation range:', [synth_counts[0], synth_counts[-1]])
     print('Data attenuation range:', [projections.min(), projections.max()])
 
     print('Applying transfer function.')    
+    
+    time.sleep(0.1) # Give time to print messages before the progress is created
     
     for ii in tqdm(range(projections.shape[1]), unit = 'img'):
         

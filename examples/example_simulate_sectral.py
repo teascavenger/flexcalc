@@ -3,6 +3,7 @@
 """
 Simulate spectral data with Poisson noise.
 """
+
 #%% Imports
 
 from flexdata import io
@@ -17,10 +18,12 @@ from flexcalc import process
 import numpy
    
 #%% Define a simple projection geometry:
+
 geometry = io.init_geometry(src2obj = 100, det2obj = 100, det_pixel = 0.2, 
                             theta_range = [0, 360], geom_type = 'simple')
 
-#%% Short version:
+#%% Short version of the spectral modeling:
+
 vol = phantom.cuboid([1,128,128], geometry, 8,8,8)  
 display.display_slice(vol , title = 'Phantom') 
 

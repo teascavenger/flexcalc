@@ -8,12 +8,18 @@ Created in Nov 2017
 This module uses NIST data (embedded in xraylib module) to simulate x-ray spectra of compounds.
 
 """
+# >>>>>>>>>>>>>>>>>>>>>>>>>>>> Imports >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
 import numpy
 import xraylib
+import warnings
+
 from . import resolution
+
 from flextomo import project
 from flexdata import display
+
+# >>>>>>>>>>>>>>>>>>>>>>>>>>>> Constants >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
 # Some useful physical constants:
 phys_const = {'c': 299792458, 'h': 6.62606896e-34, 'h_ev': 4.13566733e-15, 'h_bar': 1.054571628e-34, 'h_bar_ev': 6.58211899e-16,
@@ -21,12 +27,17 @@ phys_const = {'c': 299792458, 'h': 6.62606896e-34, 'h_ev': 4.13566733e-15, 'h_ba
 const_unit = {'c': 'm/c', 'h': 'J*S', 'h_ev': 'e*Vs', 'h_bar': 'J*s', 'h_bar_ev': 'eV*s',
               'e': 'colomb', 'Na': '1/mol', 're': 'm', 'me': 'kg', 'me_ev': 'ev/c**2'}
 
-def effective_spectrum(kv = 90, filtr = {'material':'Cu', 'density':8, 'thickness':0.1}, detector = {'material':'Si', 'density':5, 'thickness':1}):
+# >>>>>>>>>>>>>>>>>>>>>>>>>>>> Methods >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+
+def effective_spectrum(energy = None, kv = 90, filtr = {'material':'Cu', 'density':8, 'thickness':0.1}, detector = {'material':'Si', 'density':5, 'thickness':1}):
     """
     Generate an effective specturm of a CT scanner.
     """            
-    energy = numpy.linspace(10, 90, 9)
     
+    # Energy range:
+    if not energy:
+        energy = numpy.linspace(10, 90, 9)
+        
     # Tube:
     spectrum = bremsstrahlung(energy, kv) 
     
@@ -244,6 +255,12 @@ def bremsstrahlung(energy, energy_max):
     '''
     Simple bremstrahlung model (Kramer formula). Emax
     '''
+    if energy_max < 10:
+        
+        warnings.warn('Maximum energy in the Kramer formula is too low. Setting to 100kV')
+        energy_max = 100
+        
+    # Kramer:    
     spectrum = energy * (energy_max - energy)
     spectrum[spectrum < 0] = 0
 

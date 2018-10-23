@@ -150,7 +150,7 @@ class Pipe:
     _ignore_warnings_ = True
     _history_ = {}
     
-    def __init__(self, memmap_path = '', hostname ='', pas = '', usr = '', pipe = None):
+    def __init__(self, memmap_path = '', hostname ='', usr = '', pas = None, pipe = None):
         """
         Initialize the Pipe!
         """
@@ -772,7 +772,7 @@ class Pipe:
         # Use toml files:
         file = os.path.join(data.path, path, 'spectrum.toml')
         if os.path.exists(file):
-            spec = io.read_meta(file)
+            spec = io.read_toml(file)
             
         else:
             raise Exception('File not found:' + file)
@@ -1391,7 +1391,9 @@ class Pipe:
                                         
         elif display_type == 'slice':
             display.display_slice(data.data, dim = dim, title = 'Mid slice. Block #%u'%count)    
-                                   
+                   
+        else: raise Exception('Unknown display type.')
+                                  
         if print_geom:
            print('Geometry:')
            print(data.meta['geometry'])

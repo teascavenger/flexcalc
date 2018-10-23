@@ -8,6 +8,7 @@ Here we will load the spectral data from JINR.
 #%% Imports
 
 from flexdata import io
+from flexdata import array
 from flexdata import display
 from flextomo import project
 
@@ -19,7 +20,7 @@ path = '/ufs/ciacc/flexbox/JINR_data/projections/SPos0/Energy150000/'
 proj = io.read_tiffs(path, '00')
 
 # Transpose for ASTRA compatibility:
-proj = io.raw2astra(proj) 
+proj = array.raw2astra(proj) 
 
 # Get rid of funny values:
 proj[(~numpy.isfinite(proj)) | (proj < 0.1)] = 1  
@@ -55,13 +56,13 @@ src2obj = 120
 det2obj = 220 - src2obj
 img_pixel = 0.029145
 det_pixel = 0.055
-theta_range = [360, 0]
+theta_range = [0, 360]
 theta_count = 360
 
 hrz_cntr = proj.shape[2] / 2
 vrt_cntr = proj.shape[0] / 2
 
-geometry = io.init_geometry(src2obj, det2obj, det_pixel, theta_range, geom_type = 'simple')
+geometry = io.init_geometry(src2obj, det2obj, det_pixel, theta_range, geom_type = 'static_offsets')
 
 # Source position:
 geometry['src_hrz'] = (822 - hrz_cntr) * det_pixel
