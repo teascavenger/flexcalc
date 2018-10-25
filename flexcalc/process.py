@@ -631,7 +631,8 @@ def register_volumes(fixed, moving, subsamp = 2, use_moments = True, use_CG = Tr
         # Show the result of moments registration:
         L2 = norm(fixed_0 - affine(moving_0.copy(), Rtot, Ttot))
         print('L2 norm after moments registration: %0.2e' % L2)
-            
+        time.sleep(0.1)    
+        
         # Run CG with the best result:
         Ttot, Rtot, L = _itk_registration_(fixed_0, moving_0, Rtot, Ttot, shrink = [8, 2, 1], smooth = [8, 2, 0])               
             
@@ -677,11 +678,15 @@ def register_astra_geometry(proj_fix, proj_mov, geom_fix, geom_mov, subsamp = 1)
     vol1 = numpy.zeros(sz, dtype = 'float32')
     vol2 = numpy.zeros(sz, dtype = 'float32')
     
+    project.settings['bounds'] = [0, 5]
+    project.settings['block_number'] = 10
+    project.settings['mode'] = 'random'
+    
     project.FDK(proj_fix, vol1, geom_fix)    
-    project.SIRT(proj_fix, vol1, geom_fix, iterations = 2, options = {'bounds':[0, 5], 'block_number':10, 'mode':'random'})
+    project.SIRT(proj_fix, vol1, geom_fix, iterations = 2)
     
     project.FDK(proj_mov, vol2, geom_mov)
-    project.SIRT(proj_mov, vol2, geom_mov, iterations = 2, options = {'bounds':[0, 5], 'block_number':10, 'mode':'random'})
+    project.SIRT(proj_mov, vol2, geom_mov, iterations = 2)
     
     # Find transformation between two volumes:
     R, T = register_volumes(vol1, vol2, subsamp = subsamp, use_moments = True, use_CG = True)
@@ -760,6 +765,24 @@ def histogram(data, nbin = 256, rng = [], plot = True, log = False):
         display.plot(x, y, semilogy = log, title = 'Histogram')
     
     return x, y
+
+def equalize_intensity(master, slave, mode = 'percentile'):
+    """
+    Compute 99.99th percentile of two volumes and use it to renormalize the slave volume.
+    """
+    if mode == 'percentile':
+        m = numpy.percentile(master, 99.99) 
+        s = numpy.percentile(slave, 99.99) 
+        
+        slave *= (m / s)
+    elif mode == 'histogram':
+        
+        a1, b1, c1 = intensity_range(master[::2, ::2, ::2])
+        a2, b2, c2 = intensity_range(slave[::2, ::2, ::2])
+        
+        slave *= (c1 / c2)
+        
+    else: raise Exception('Unknown mode:' + mode)
 
 def intensity_range(data):
     """

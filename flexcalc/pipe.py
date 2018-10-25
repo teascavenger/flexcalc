@@ -115,11 +115,11 @@ class Block:
         self.data = []
         
         gc.collect()
+                
+        print('Block flushed.')
         
         # It seems that sometimes memore is released after a small delay
         time.sleep(1)
-                
-        print('Block flushed.')
         
     def __del__(self):
         """
@@ -291,10 +291,14 @@ class Pipe:
                         
         self._data_que_.append(block)
         
-    def pull_data(self, local_path, remote_path, hostname, username, password = None):
+    def pull_data(self, local_path, remote_path, hostname, username, password = None, cleanup = False):
         """
         Pull all data from the host.
+        cleanup - clean up the folder before copying to it.
         """
+        if cleanup:
+            io.delete_path(local_path)
+            
         scp.ssh_get_path(hostname, username, password, local_path, remote_path)  
         
     def push_data(self, local_path, remote_path, hostname, username, password = None, cleanup = False):
@@ -457,6 +461,7 @@ class Pipe:
                         gc.collect() 
                         
                         print('%u%% memory left (%u GB).' % (io.free_memory(True), io.free_memory(False)))
+                        time.sleep(0.1)
             
                         # Make an end log record
                         self._block_.finish(action.name, action.arguments)
@@ -528,7 +533,9 @@ class Pipe:
             
         if len(pending) == 0:                
             raise Exception('ERROR@!!!!@!! Pipe is empty...')
-                        
+        
+        print('@ ' + pending[0].path)
+                
         # Current data in the pipe:            
         return pending[0]  
 
@@ -1035,7 +1042,7 @@ class Pipe:
             data.data = data.data[dif:-dif,:,:]
             
         else:
-            ramp = int(overlap / 2)
+            ramp = 1 + int(overlap / 2)
             
         print('New data shape is', data.data.shape)            
                     
@@ -1103,16 +1110,17 @@ class Pipe:
         #safety = data.data.shape[0] // 10
         vol = numpy.zeros([shape[0], shape[2], shape[2]], dtype = 'float32')
         
+        project.settings['block_number'] = 20
         project.FDK(data.data, vol, data.meta['geometry'])
         
         em = self._arg_(argument,0)
         sirt = self._arg_(argument,1)
         
         if em:
-            project.EM(data.data, vol, data.meta['geometry'], iterations = em, options = {'block_number':20})
+            project.EM(data.data, vol, data.meta['geometry'], iterations = em)
             
         if sirt:
-            project.SIRT(data.data, vol, data.meta['geometry'], iterations = sirt, options = {'bounds' :[0,10], 'block_number':20})
+            project.SIRT(data.data, vol, data.meta['geometry'], iterations = sirt)
 
         # Replace projection data with volume data:
         data.data = vol
@@ -1138,9 +1146,11 @@ class Pipe:
         block_number = self._arg_(argument, 1)
         mode = self._arg_(argument, 2)
         
-        options = {'bounds':[0, 2], 'l2_update':False, 'block_number':block_number, 'mode':mode}
+        project.settings['bounds'] = [0, 10]
+        project.settings['block_number'] = block_number
+        project.settings['mode'] = mode
                 
-        project.SIRT(data.data, vol, data.meta['geometry'], iterations = iterations, options = options)
+        project.SIRT(data.data, vol, data.meta['geometry'], iterations = iterations)
                 
         # Replace projection data with volume data:
         data.data = vol 
@@ -1187,7 +1197,11 @@ class Pipe:
         block_number = self._arg_(argument, 1)
         mode = self._arg_(argument, 2)
         
-        project.EM(data.data, vol, data.meta['geometry'], iterations = iterations, options = {'bounds': [0, 2], 'block_number':block_number, 'mode':mode})
+        project.settings['bounds'] = [0, 10]
+        project.settings['block_number'] = block_number
+        project.settings['mode'] = mode
+        
+        project.EM(data.data, vol, data.meta['geometry'], iterations = iterations)
         
         # Replace projection data with volume data:
         data.data = vol
@@ -1334,12 +1348,13 @@ class Pipe:
     
         print('Marker density is: %2.2f' % rho)
         
-        if rho < 0.1:
-            raise ValueError('Suspicious marker density: %0.2f. Will not apply correction!' % rho)
+        if abs(rho - normalization_value) > normalization_value / 4:
+            print('Suspicious marker density: %0.2f. Will not apply correction!' % rho)
+            
+        else:
+            data.data *= (normalization_value / rho)
         
-        data.data *= (normalization_value / rho)
-        
-        self._record_history_('Marker based normalization. [old, new]', [rho, normalization_value])
+            self._record_history_('Marker based normalization. [old, new]', [rho, normalization_value])
         
     def marker_normalization(self, normalization_value = 1):
         """
