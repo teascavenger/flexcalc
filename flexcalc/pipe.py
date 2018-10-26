@@ -22,7 +22,6 @@ from flexdata import scp
 from flexdata import io
 from flexdata import display
 from flexdata import array
-from flextomo import phantom
 from flextomo import project
 from . import process
 
@@ -299,13 +298,13 @@ class Pipe:
         if cleanup:
             scp.delete_local(local_path)
             
-        scp.ssh_get_path(hostname, username, password, local_path, remote_path)  
+        scp.ssh_get_path(local_path, remote_path, hostname, username, password)  
         
     def push_data(self, local_path, remote_path, hostname, username, password = None, cleanup = False):
         """
         Push all data to the host.
         """
-        scp.ssh_put_path(hostname, username, password, local_path, remote_path)  
+        scp.ssh_put_path(local_path, remote_path, hostname, username, password)  
         
         if cleanup:
             scp.delete_local(local_path)
