@@ -1427,6 +1427,8 @@ def append_tile(data, geom, tot_data, tot_geom):
     norm = (base_dist + new_dist)
     norm[norm == 0] = numpy.inf
     
+    time.sleep(0.5)
+    
     # Apply offsets:
     for ii in tqdm(range(tot_data.shape[1]), unit='img'):   
         
@@ -1692,7 +1694,7 @@ def equivalent_density(projections, meta, energy, spectr, compound, density = 2,
 
     print('Applying transfer function.')    
     
-    time.sleep(0.1) # Give time to print messages before the progress is created
+    time.sleep(0.5) # Give time to print messages before the progress is created
     
     for ii in tqdm(range(projections.shape[1]), unit = 'img'):
         

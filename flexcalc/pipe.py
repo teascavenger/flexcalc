@@ -297,7 +297,7 @@ class Pipe:
         cleanup - clean up the folder before copying to it.
         """
         if cleanup:
-            io.delete_path(local_path)
+            scp.delete_local(local_path)
             
         scp.ssh_get_path(hostname, username, password, local_path, remote_path)  
         
@@ -308,7 +308,7 @@ class Pipe:
         scp.ssh_put_path(hostname, username, password, local_path, remote_path)  
         
         if cleanup:
-            io.delete_path(local_path)
+            scp.delete_local(local_path)
     
     def add_data(self, local_path):
         """
@@ -318,7 +318,7 @@ class Pipe:
         
         print('Adding: ', local_path)
         
-        time.sleep(0.1) # This is needed to let print message be printed before the porogress bar
+        time.sleep(0.5) # This is needed to let print message be printed before the porogress bar
         
         if not '*' in local_path:
 
@@ -380,7 +380,7 @@ class Pipe:
         print(' *** Starting a pipe run *** ')
         
         try:
-            
+                
             # Show available RAM:
             print('Starting with %u%% free memory (%u GB).' % (io.free_memory(True), io.free_memory(False)))
     
@@ -415,6 +415,9 @@ class Pipe:
                                 warnings.filterwarnings("ignore")
                             else:
                                 warnings.filterwarnings("default")
+                                
+                            # To let things be printed in time:
+                            time.sleep(0.5)                                
             
                             # Run action:
                             action.callback(self._block_, action.count, action.arguments) 
@@ -453,6 +456,9 @@ class Pipe:
                             warnings.filterwarnings("ignore")
                         else:
                             warnings.filterwarnings("default")
+                        
+                        # To let things be printed in time:
+                        time.sleep(0.5)                            
                             
                         # Apply action  
                         action.callback(self._block_, action.count, action.arguments)
@@ -461,14 +467,14 @@ class Pipe:
                         gc.collect() 
                         
                         print('%u%% memory left (%u GB).' % (io.free_memory(True), io.free_memory(False)))
-                        time.sleep(0.1)
+                        time.sleep(0.5)
             
                         # Make an end log record
                         self._block_.finish(action.name, action.arguments)
                         
                 if self._block_.status == _STATUS_PENDING_:
                     self._block_.status = _STATUS_READY_
-        
+            
         except:
             
             info = sys.exc_info()
@@ -479,7 +485,6 @@ class Pipe:
             print("")
                         
             print('Will try to continue....')
-       
             
     def report(self):
         """
@@ -1348,7 +1353,7 @@ class Pipe:
     
         print('Marker density is: %2.2f' % rho)
         
-        if abs(rho - normalization_value) > normalization_value / 4:
+        if abs(rho - normalization_value) > normalization_value:
             print('Suspicious marker density: %0.2f. Will not apply correction!' % rho)
             
         else:
