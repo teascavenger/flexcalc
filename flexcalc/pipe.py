@@ -172,6 +172,17 @@ class Pipe:
         self._memmaps_ = []    
         self._memmap_path_ = memmap_path
         
+        # Clean-up memmap path:
+        if os.path.exists(memmap_path):
+            
+            files = os.listdir(memmap_path)
+            
+            for file in files:
+                if os.path.isfile(file): os.remove(file)
+            
+        if not os.path.exists(self._memmap_path_):
+                os.mkdir(self._memmap_path_)  
+        
         # SSH info:
         self._hostname_ = hostname
         self._pas_ = pas

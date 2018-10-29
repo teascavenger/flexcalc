@@ -1158,13 +1158,16 @@ def optimize_rotation_center(projections, geometry, guess = None, subscale = 1, 
     
     return guess
 
-def process_flex(path, sample = 1, skip = 1, memmap = None, index = None):
+def process_flex(path, sample = 1, skip = 1, memmap = None, proj_number = None):
     '''
     Read and process the data.
     
     Args:
         path:  path to the flexray data
-        options: dictionary of options, such as bin (binning), memmap (use memmap to save RAM)
+        sample:
+        skip:    
+        memmap:    
+        proj_number (int): force projection number (treat lesser numbers as missing)
         
     Return:
         proj: min-log projections
@@ -1175,7 +1178,7 @@ def process_flex(path, sample = 1, skip = 1, memmap = None, index = None):
     print('Reading...')
     
     #index = []
-    proj, flat, dark, meta = io.read_flexray(path, sample = sample, skip = skip, memmap = memmap)
+    proj, flat, dark, meta = io.read_flexray(path, sample = sample, skip = skip, memmap = memmap, proj_number = proj_number)
                 
     # Show fow much memory we have:
     #flexUtil.print_memory()     
