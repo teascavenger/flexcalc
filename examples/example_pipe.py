@@ -36,7 +36,7 @@ pipe.display(dim = 1)                                                  # Show th
 pipe.ramp(width = [10, 10], dim = 2, mode = 'linear')                  # To avoid border artifacts - pad and ramp (not really needed with this data)
 
 # Find rotation:
-pipe.find_rotation()                                                   # Correct for deviations in rotation centre if needed 
+pipe.find_rotation(subscale = 4)                                       # Correct for deviations in rotation centre if needed 
 
 # Reconstruct:
 pipe.FDK()                                                             # Reconstruct using FDK 
@@ -49,7 +49,7 @@ pipe.display(dim = 0, display_type = 'slice')
 pipe.auto_crop()                                                       # Cut the air out 
 
 #pipe.marker_normalization(2.7)                                        # There are no density markers in this data unfortunately...
-pipe.soft_threshold(mode = 'otsu')                                     # Kill small values. Otsu mode is more agressive. 
+pipe.soft_threshold(mode = 'otsu')                                     # Kill small values. 'otsu' mode is more agressive than the 'histogram' mode.
 
 pipe.display(dim = 1, display_type = 'max_projection')                 # Show
 pipe.display(dim = 2, display_type = 'max_projection')

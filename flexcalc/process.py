@@ -68,7 +68,8 @@ def bounding_box(data):
     """
     # Avoid memory overflow!
     #data = data.copy()
-    data2 = data[::2, ::2, ::2].copy()
+    data2 = data[::2, ::2, ::2].astype('float32')
+    data2 = array.bin(data2)
     
     soft_threshold(data2, mode = 'otsu')
 
@@ -108,14 +109,14 @@ def bounding_box(data):
     c[0] = c[0] - c_int
     c[1] = c[1] + c_int
     
-    a[0] = max(0, a[0] * 2)
-    a[1] = min(data.shape[0], a[1] * 2)
+    a[0] = max(0, a[0] * 4)
+    a[1] = min(data.shape[0], a[1] * 4)
     
-    b[0] = max(0, b[0] * 2)
-    b[1] = min(data.shape[1], b[1] * 2)
+    b[0] = max(0, b[0] * 4)
+    b[1] = min(data.shape[1], b[1] * 4)
     
-    c[0] = max(0, c[0] * 2)
-    c[1] = min(data.shape[2], c[1] * 2)
+    c[0] = max(0, c[0] * 4)
+    c[1] = min(data.shape[2], c[1] * 4)
     
     return a, b, c
 
@@ -213,8 +214,8 @@ def _find_best_flip_(fixed, moving, Rfix, Tfix, Rmov, Tmov, use_CG = True, sampl
         (array): rotation matrix corresponding to the best flip
     
     """
-    fixed = fixed[::sample, ::sample, ::sample].copy()
-    moving = moving[::sample, ::sample, ::sample].copy()
+    fixed = fixed[::sample, ::sample, ::sample].astype('float32')
+    moving = moving[::sample, ::sample, ::sample].astype('float32')
     
     # Apply filters to smooth erors somewhat:
     fixed = ndimage.filters.gaussian_filter(fixed, sigma = 2)
@@ -257,25 +258,29 @@ def convolve_kernel(data, kernel):
     
     return numpy.real(numpy.fft.ifftn(numpy.fft.fftn(data) * kernel))
 
-def find_marker(data, meta, r = 5):
+def find_marker(data, meta, d = 5, density = 2.7):
     """
-    Find a marker in 3D volume by applying a circular kernel with inner radius r [mm].
+    Find a marker in 3D volume by applying a circular kernel with an inner diameter d [mm].
     """
     # TODO: it fail sometimes when the marker is adjuscent to something...
     
     #data = data.copy()
     # First subsample data to avoid memory overflow:
-    data2 = data[::2, ::2, ::2].copy()
+    data2 = data[::2, ::2, ::2].astype('float32')
+    
+    # Data will be binned further to avoid memory errors.
+    data2 = array.bin(data2)
+    r = d / 8
         
     # Get areas with significant density:
     t = binary_threshold(data2, mode = 'otsu')
     threshold = numpy.float32(data2 > t)
     
     # Create a circular kernel (take into account subsampling of data2):
-    kernel = -0.5 * phantom.sphere(data2.shape, meta['geometry'], r, [0,0,0])
-    kernel += phantom.sphere(data2.shape, meta['geometry'], r / 2, [0,0,0])
+    kernel = -0.5 * phantom.sphere(data2.shape, meta['geometry'], r * 2, [0,0,0])
+    kernel += phantom.sphere(data2.shape, meta['geometry'], r, [0,0,0])
 
-    kernel[kernel > 0] *= ((r * 2)**3 - r**3) / r**3
+    kernel[kernel > 0] *= (2**3 - 1)
     
     print('Computing feature sizes...')
     
@@ -283,11 +288,13 @@ def find_marker(data, meta, r = 5):
     A = convolve_kernel(threshold, kernel)
     A /= A.max()
     
+    display.display_max_projection(A, dim = 0, title = 'Feature size.')
+    
     print('Estimating local variance...')
     
     # Now estimate the local variance:
     B = ndimage.filters.laplace(data2) ** 2    
-    B /= data2
+    B /= (numpy.abs(data2) + data2.max()/100)
     
     # Make sure that boundaries don't affect variance estimation:
     threshold = threshold == 0
@@ -295,14 +302,18 @@ def find_marker(data, meta, r = 5):
     threshold = ndimage.morphology.binary_dilation(threshold)
     
     B[threshold] = 0
-    B = ndimage.filters.gaussian_filter(B, 3)
+    B = numpy.sqrt(B)
+    B = ndimage.filters.gaussian_filter(B, 4)
     B /= B.max()
+    
+    display.display_max_projection(B, dim = 0, title = 'Variance.')
     
     # Compute final weight:    
     A -= B
     
     # Make it dependent on absolote intensity: (could be dependent on distance from some value....)
-    A *= data2
+    A *= numpy.sqrt(data2)
+    #A -= numpy.sqrt((data2 - density)**2 + density / 10)
     
     print('A.max', A.max())
     
@@ -317,9 +328,9 @@ def find_marker(data, meta, r = 5):
     a, b, c = numpy.unravel_index(index, A.shape)
     
     # Upsample:
-    a *= 2
-    b *= 2
-    c *= 2
+    a *= 4
+    b *= 4
+    c *= 4
     
     print('Found the marker at:', a, b, c)
     
@@ -817,11 +828,11 @@ def centre(data):
         """
         Compute the centre of the square of mass.
         """
-        data2 = data.copy()**2
+        data2 = data[::2, ::2, ::2].astype('float32')()**2
         
         M00 = data2.sum()
                 
-        return [moment2(data2, 1, 0) / M00, moment2(data2, 1, 1) / M00, moment2(data2, 1, 2) / M00]
+        return [moment2(data2, 1, 0) / M00 * 2, moment2(data2, 1, 1) / M00 * 2, moment2(data2, 1, 2) / M00 * 2]
 
 def moment3(data, order, center = numpy.zeros(3), subsample = 1):
     '''
@@ -1158,15 +1169,16 @@ def optimize_rotation_center(projections, geometry, guess = None, subscale = 1, 
     
     return guess
 
-def process_flex(path, sample = 1, skip = 1, memmap = None, proj_number = None):
+def process_flex(path, sample = 1, skip = 1, memmap = None, index = None, proj_number = None):
     '''
     Read and process the data.
     
     Args:
         path:  path to the flexray data
         sample:
-        skip:    
-        memmap:    
+        skip:
+        memmap:
+        index:
         proj_number (int): force projection number (treat lesser numbers as missing)
         
     Return:

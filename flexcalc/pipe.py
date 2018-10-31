@@ -1054,7 +1054,8 @@ class Pipe:
             
             print('Ramp of %u pixels is applied in volume merge. Will crop %u pixels before merge to reduce the risk of artifacts.' % (ramp, dif))
             
-            data.data = data.data[dif:-dif,:,:]
+            data.data = array.crop(data.data, 0, [dif, dif])
+            #data.data = data.data[dif:-dif,:,:] - this is not memmap-friendly
             
         else:
             ramp = 1 + int(overlap / 2)
@@ -1461,11 +1462,11 @@ class Pipe:
         # Clean up memory
         gc.collect()
 
-    def memmap(self, path):
+    def memmap(self):
         """
         Push data into a memmap.
         """
-        self._add_action_('memmap', self._memmap_, _ACTION_BATCH_, path)                
+        self._add_action_('memmap', self._memmap_, _ACTION_BATCH_)                
             
     def _write_flexray_(self, data, count, argument):
         """
