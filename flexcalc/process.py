@@ -258,7 +258,7 @@ def convolve_kernel(data, kernel):
     
     return numpy.real(numpy.fft.ifftn(numpy.fft.fftn(data) * kernel))
 
-def find_marker(data, meta, d = 5, density = 2.7):
+def find_marker(data, meta, d = 5):
     """
     Find a marker in 3D volume by applying a circular kernel with an inner diameter d [mm].
     """
@@ -270,7 +270,7 @@ def find_marker(data, meta, d = 5, density = 2.7):
     
     # Data will be binned further to avoid memory errors.
     data2 = array.bin(data2)
-    r = d / 8
+    r = d / 4
         
     # Get areas with significant density:
     t = binary_threshold(data2, mode = 'otsu')
@@ -1289,9 +1289,12 @@ def _find_shift_(data_ref, data_slave, offset, dim = 1):
         im_slv = numpy.squeeze(data_slave[sl]).copy()
         
         # Make sure that the data we compare is the same size:.        
-
+        if (min(offset) < 0)|(offset[1] + im_slv.shape[1] > im_ref.shape[1])|(offset[0] + im_slv.shape[0] > im_ref.shape[0]):
+            raise Exception('The total data is too small to be merged witht the current tile!')
+            # TODO: make formula for smaller total size of the total data
+            
         im_ref = im_ref[offset[0]:offset[0] + im_slv.shape[0], offset[1]:offset[1] + im_slv.shape[1]]
-    
+            
         # Find common area:        
         no_zero = (im_ref * im_slv) != 0
 
@@ -1311,11 +1314,7 @@ def _find_shift_(data_ref, data_slave, offset, dim = 1):
         
             # Shift registration with subpixel accuracy (skimage):
             shift, error, diffphase = feature.register_translation(im_ref, im_slv, 10)
-            
-            if shift[0] is numpy.nan:
-                display.display_slice(im_ref, title = 'ref')
-                display.display_slice(im_slv, title = 'slv')
-            
+                        
             shifts.append(shift)
 
     shifts = numpy.array(shifts)            

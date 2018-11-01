@@ -168,21 +168,12 @@ class Pipe:
         # Connection to other pipes:
         self._connections_ = []    
 
-        # Memmaps - need to delete them at the end:
-        self._memmaps_ = []    
+        # Memmaps - need to delete them at the end: 
         self._memmap_path_ = memmap_path
         
         # Clean-up memmap path:
-        if os.path.exists(memmap_path):
+        self._remove_memmap_path_()
             
-            files = os.listdir(memmap_path)
-            
-            for file in files:
-                if os.path.isfile(file): os.remove(file)
-            
-        if not os.path.exists(self._memmap_path_):
-                os.mkdir(self._memmap_path_)  
-        
         # SSH info:
         self._hostname_ = hostname
         self._pas_ = pas
@@ -191,6 +182,23 @@ class Pipe:
         # If pipe is provided - copy it's action que!
         if pipe:
             self.template(pipe)
+         
+    def _remove_memmap_path_(self):
+        if os.path.exists(self._memmap_path_):
+            
+            print('Removing memmaps @' + self._memmap_path_)
+            files = os.listdir(self._memmap_path_)
+            
+            for file in files:
+                
+                file_ = os.path.join(self._memmap_path_, file)
+            
+                if os.path.isfile(file_): 
+                    print('Removing:' + file_)
+                    os.remove(file_)
+            
+        if not os.path.exists(self._memmap_path_):
+                os.mkdir(self._memmap_path_)             
             
     def ignore_warnings(self, ignore = True):
         """
@@ -236,17 +244,7 @@ class Pipe:
         """
         self._buffer_ = {}
         gc.collect()
-        
-    def flush_memmaps(self):    
-        """
-        Remove memmaps.
-        """
-        for memmap in self._memmaps_:
-            print('Removing memmap:', memmap)
-            if os.path.isfile(memmap): os.remove(memmap)
-            
-        self._memmaps_ = []
-         
+                 
     def flush(self):
         """
         Flush the data.
@@ -268,9 +266,6 @@ class Pipe:
         # Buffer for the group actions:
         self.flush_buffer()
         
-        # Remove my memmaps:
-        self.flush_memmaps()
-
     def clean(self):
         """
         Erase everything!
@@ -675,7 +670,6 @@ class Pipe:
                         os.mkdir(self._memmap_path_)  
             
             memmap_file = os.path.join(self._memmap_path_, 'volume')
-            self._memmaps_.append(memmap_file)
             
         else:
             memmap_file = None
@@ -713,9 +707,7 @@ class Pipe:
             if not os.path.exists(self._memmap_path_):
                         os.mkdir(self._memmap_path_)  
             
-            memmap_file = os.path.join(self._memmap_path_, 'projections')
-            self._memmaps_.append(memmap_file)
-            
+            memmap_file = os.path.join(self._memmap_path_, 'projections')            
         else:
             memmap_file = None
         
@@ -756,9 +748,7 @@ class Pipe:
             if not os.path.exists(self._memmap_path_):
                         os.mkdir(self._memmap_path_)  
                         
-            memmap_file = os.path.join(self._memmap_path_, 'projections')
-            self._memmaps_.append(memmap_file)
-            
+            memmap_file = os.path.join(self._memmap_path_, 'projections')            
         else:
             memmap_file = None
             
@@ -894,9 +884,7 @@ class Pipe:
                         os.mkdir(self._memmap_path_)  
                         
                     file = os.path.join(self._memmap_path_, 'detector%u' % ii)
-                                        
-                    self._memmaps_.append(file)
-                    total = numpy.memmap(file, dtype='float32', mode='w+', shape = (tot_shape[0],tot_shape[1],tot_shape[2]))       
+                    total = array.memmap(file, dtype='float32', mode='w+', shape = (tot_shape[0],tot_shape[1],tot_shape[2]))       
                     
                 else:
                     total = numpy.zeros(tot_shape, dtype='float32')          
@@ -1008,8 +996,7 @@ class Pipe:
                 if not os.path.exists(self._memmap_path_):
                         os.mkdir(self._memmap_path_)  
                 
-                self._memmaps_.append(file)
-                total = numpy.memmap(file, dtype=data.data.dtype, mode='w+', shape = (tot_shape[0],tot_shape[1],tot_shape[2]))       
+                total = array.memmap(file, dtype=data.data.dtype, mode='w+', shape = (tot_shape[0],tot_shape[1],tot_shape[2]))       
                 
             else:
                 total = numpy.zeros(tot_shape, dtype=data.data.dtype)     
@@ -1297,6 +1284,9 @@ class Pipe:
         
         data.data = array.bin(data.data, dim)
         
+        data.meta['geometry']['img_pixel'] *= 2
+        data.meta['geometry']['det_pixel'] *= 2
+        
         self._record_history_('Binning applied. [dim]', dim)
 
     def bin(self, dim = None):
@@ -1448,13 +1438,11 @@ class Pipe:
         if not os.path.exists(self._memmap_path_):
                         os.mkdir(self._memmap_path_)  
         
-        memmap_file = os.path.join(self._memmap_path_, 'block_%u'%count)
-        self._memmaps_.append(memmap_file)
-                        
+        memmap_file = os.path.join(self._memmap_path_, 'block_%u'%count)                        
         shape = data.data.shape
         dtype = data.data.dtype
         
-        memmap = numpy.memmap(memmap_file, dtype=dtype, mode='w+', shape = (shape[0], shape[1], shape[2]))       
+        memmap = array.memmap(memmap_file, dtype=dtype, mode='w+', shape = (shape[0], shape[1], shape[2]))       
         
         memmap[:] = data.data[:]
         data.data = memmap

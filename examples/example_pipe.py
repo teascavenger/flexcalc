@@ -20,8 +20,8 @@ pipe = pipe.Pipe(memmap_path = '/export/scratch3/kostenko/flexbox_scratch/')
 #pipe.ignore_warnings(True)
 
 # Pre-processing:
-binning = 2                                                            # Use binning to accelerate the test run 
-pipe.process_flex(sampling = binning, skip = binning)                  # Pre-process the dataset
+binning = 1                                                           # Use binning to accelerate the test run 
+pipe.process_flex(sampling = binning, skip = binning)  # Pre-process the dataset
 
 pipe.read_all_meta(sampling = binning)                                 # Load all metadata to compute tile positioning later
 
