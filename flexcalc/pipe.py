@@ -111,6 +111,9 @@ class Block:
         
     def flush(self):
         
+        if isinstance(self.data, array.memmap):
+            self.data.delete()
+            
         self.data = []
         
         gc.collect()
@@ -182,6 +185,11 @@ class Pipe:
         # If pipe is provided - copy it's action que!
         if pipe:
             self.template(pipe)
+            
+    def delete(self, data):
+        # if array is memmap - call delete method:
+        if isinstance(data, array.memmap):
+            data.delete()        
          
     def _remove_memmap_path_(self):
         if os.path.exists(self._memmap_path_):
@@ -242,7 +250,12 @@ class Pipe:
         """
         Flush the buffer only.
         """
-        self._buffer_ = {}
+        if len(self._buffer_) > 0:
+            for key in self._buffer_:
+                self.delete(self._buffer_[key])
+                
+            self._buffer_ = {}
+            
         gc.collect()
                  
     def flush(self):
@@ -1126,6 +1139,7 @@ class Pipe:
             project.SIRT(data.data, vol, data.meta['geometry'], iterations = sirt)
 
         # Replace projection data with volume data:
+        self.delete(data.data)
         data.data = vol
         data.type = 'volume'
         
@@ -1156,6 +1170,7 @@ class Pipe:
         project.SIRT(data.data, vol, data.meta['geometry'], iterations = iterations)
                 
         # Replace projection data with volume data:
+        self.delete(data.data)
         data.data = vol 
         data.type = 'volume'
         
@@ -1207,6 +1222,7 @@ class Pipe:
         project.EM(data.data, vol, data.meta['geometry'], iterations = iterations)
         
         # Replace projection data with volume data:
+        self.delete(data.data)
         data.data = vol
         data.type = 'volume'
         

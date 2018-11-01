@@ -20,7 +20,7 @@ pipe = pipe.Pipe(memmap_path = '/export/scratch3/kostenko/flexbox_scratch/')
 #pipe.ignore_warnings(True)
 
 # Pre-processing:
-binning = 1                                                           # Use binning to accelerate the test run 
+binning = 2                                                           # Use binning to accelerate the test run 
 pipe.process_flex(sampling = binning, skip = binning)  # Pre-process the dataset
 
 pipe.read_all_meta(sampling = binning)                                 # Load all metadata to compute tile positioning later
@@ -40,6 +40,8 @@ pipe.find_rotation(subscale = 4)                                       # Correct
 
 # Reconstruct:
 pipe.FDK()                                                             # Reconstruct using FDK 
+
+pipe.memmap()                                                          # Move RAM to memmap to free up memory
 
 pipe.display(dim = 0, display_type = 'slice')
 
@@ -73,3 +75,5 @@ pipe.make_stl(file = '../surface.stl', preview = True)
 pipe.add_data('/ufs/ciacc/flexbox/test_data/ivory/t*')                 # Where the data is... 
 
 pipe.run()                                                             # Run Lola Run! 
+
+pipe.flush()
