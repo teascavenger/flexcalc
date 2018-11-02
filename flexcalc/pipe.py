@@ -612,7 +612,9 @@ class Pipe:
        self._block_ = self._data_que_[0]
        
        print('Data que populated with the buffer content. Removing the buffer...') 
-       self.flush_buffer()
+       #self.flush_buffer()
+       # flush_buffer deletes memmaps - don't use it here!
+       self._buffer_ = {}
        
     def _record_history_(self, key, arguments = []):
         """
@@ -944,9 +946,6 @@ class Pipe:
            # Replace all datastreams with the result: 
            self._buffer_to_que_()
            
-           # Clear buffer:
-           #self.flush_buffer()
-           
     def merge_detectors(self, memmap = False):
         """
         Merge detectors into a single image. Will produce a separate datablock for each source position. 
@@ -1055,6 +1054,7 @@ class Pipe:
             print('Ramp of %u pixels is applied in volume merge. Will crop %u pixels before merge to reduce the risk of artifacts.' % (ramp, dif))
             
             data.data = array.crop(data.data, 0, [dif, dif])
+            
             #data.data = data.data[dif:-dif,:,:] - this is not memmap-friendly
             
         else:
@@ -1103,12 +1103,15 @@ class Pipe:
            
         else:
            # If this is the last call:
+           self.delete(data.data)
            data.data = total
 
            # Replace all datasteams with the result: 
            self._data_que_ = [data,]
            
-           self.flush_buffer()
+           #self.flush_buffer()
+           # flush_buffer deletes memmaps - don't use it here!
+           self._buffer_ = {}
 
         gc.collect()
 
@@ -1296,20 +1299,18 @@ class Pipe:
         """
         print('Applying binning...')
         
-        dim = self._arg_(argument, 0)
-        
-        data.data = array.bin(data.data, dim)
+        data.data = array.bin(data.data)
         
         data.meta['geometry']['img_pixel'] *= 2
         data.meta['geometry']['det_pixel'] *= 2
         
-        self._record_history_('Binning applied. [dim]', dim)
+        self._record_history_('Binning applied.')
 
-    def bin(self, dim = None):
+    def bin(self):
         """
         FBin the data in certain direction or in all at the same time.
         """
-        self._add_action_('bin', self._bin_, _ACTION_BATCH_, dim)                
+        self._add_action_('bin', self._bin_, _ACTION_BATCH_)                
                     
     def _crop_(self, data, count, argument):
         """

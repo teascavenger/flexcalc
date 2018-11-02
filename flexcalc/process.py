@@ -68,7 +68,7 @@ def bounding_box(data):
     """
     # Avoid memory overflow!
     #data = data.copy()
-    data2 = data[::2, ::2, ::2].astype('float32')
+    data2 = data[::2, ::2, ::2].copy().astype('float32')
     data2 = array.bin(data2)
     
     soft_threshold(data2, mode = 'otsu')
@@ -266,10 +266,12 @@ def find_marker(data, meta, d = 5):
     
     #data = data.copy()
     # First subsample data to avoid memory overflow:
-    data2 = data[::2, ::2, ::2].astype('float32')
+    data2 = data[::2, ::2, ::2].copy().astype('float32')
     
     # Data will be binned further to avoid memory errors.
     data2 = array.bin(data2)
+    data2[data2 < 0] = 0
+    
     r = d / 4
         
     # Get areas with significant density:
@@ -286,6 +288,7 @@ def find_marker(data, meta, d = 5):
     
     # Map showing the relative size of feature
     A = convolve_kernel(threshold, kernel)
+    A[A < 0] = 0
     A /= A.max()
     
     display.display_max_projection(A, dim = 0, title = 'Feature size.')
@@ -828,7 +831,7 @@ def centre(data):
         """
         Compute the centre of the square of mass.
         """
-        data2 = data[::2, ::2, ::2].astype('float32')()**2
+        data2 = data[::2, ::2, ::2].copy().astype('float32')()**2
         
         M00 = data2.sum()
                 
@@ -1111,7 +1114,7 @@ def optimize_modifier(values, projections, geometry, samp = [1, 1, 1], key = 'ax
     
     print('Starting a full search from: %0.3f' % values.min(), 'to %0.3f'% values.max())
     
-    time.sleep(0.1) # To print TQDM properly
+    time.sleep(0.5) # To print TQDM properly
     
     ii = 0
     for val in tqdm(values, unit = 'point'):
